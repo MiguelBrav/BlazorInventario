@@ -1,0 +1,195 @@
+@page "/users/new"
+@page "/users/{Id:int}"
+@attribute [Authorize(Roles = "Admin")]
+@inject BlazorInventario.Repositories.IUserRepository UserRepo
+@inject Microsoft.AspNetCore.Components.NavigationManager Navigation
+@inject Microsoft.JSInterop.IJSRuntime JS
+@using System.Text.RegularExpressions
+
+<PageTitle>Usuario</PageTitle>
+
+<h3>@(Id.HasValue ? "Editar usuario" : "Nuevo usuario")</h3>
+
+<EditForm Model="model" OnValidSubmit="Save">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    @if (isReactivating)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            <strong>Reactivación de usuario:</strong> Por seguridad, es obligatorio establecer una nueva contraseña para reactivar este usuario.
+        </div>
+    }
+
+    <div class="mb-3">
+        <label class="form-label">Nombre</label>
+        <InputText class="form-control" @bind-Value="model.name" />
+        <ValidationMessage For="@(() => model.name)" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <InputText class="form-control" @bind-Value="model.email" />
+        <ValidationMessage For="@(() => model.email)" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Rol</label>
+        <select class="form-select" @bind="model.role">
+            <option value="Storekeeper">Storekeeper</option>
+            <option value="Admin">Admin</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">
+            Contraseña
+            @if (isReactivating)
+            {
+                <span class="text-danger">*</span>
+                <small class="text-muted">(obligatoria)</small>
+            }
+            else
+            {
+                <small class="text-muted">(dejar vacío para no cambiar)</small>
+            }
+        </label>
+        <InputText type="password" class="form-control" @bind-Value="password" />
+        @if ((isReactivating || !Id.HasValue))
+        {
+            <div class="form-text">La contraseña debe tener mínimo 5 caracteres e incluir al menos una letra y un número.</div>
+        }
+        @if (!string.IsNullOrEmpty(password) && !IsPasswordValid(password))
+        {
+            <div class="text-danger small">La contraseña no cumple los requisitos mínimos.</div>
+        }
+    </div>
+
+    <div class="mb-3 form-check">
+        <InputCheckbox class="form-check-input" @bind-Value="ActiveValue" />
+        <label class="form-check-label">Activo</label>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Guardar</button>
+    <button class="btn btn-secondary ms-2" type="button" @onclick="Cancel">Cancelar</button>
+</EditForm>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private BlazorInventario.Repositories.UserRecord model = new() { is_active = true };
+    private string? password;
+    private string? errorMessage;
+    private bool isReactivating = false;
+    private bool wasInactive = false;
+
+    private bool ActiveValue
+    {
+        get => model.is_active;
+        set
+        {
+            model.is_active = value;
+            // Si estaba inactivo y ahora se marca como activo, es reactivación
+            isReactivating = wasInactive && value;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id.HasValue)
+        {
+            var r = await UserRepo.GetByIdAsync(Id.Value);
+            if (r != null)
+            {
+                model = r;
+                wasInactive = !r.is_active; // Recordar si estaba inactivo
+            }
+        }
+        else
+        {
+            model.role = "Storekeeper";
+        }
+    }
+
+    // removed OnActiveChanged; ActiveValue property handles change
+
+    async Task Save()
+    {
+        errorMessage = null;
+        try
+        {
+            // Re-evaluate reactivation in case model was modified elsewhere
+            isReactivating = wasInactive && model.is_active;
+
+            // Verificar unicidad de email
+            if (!string.IsNullOrEmpty(model.email))
+            {
+                var existing = await UserRepo.GetByEmailAsync(model.email);
+                if (existing != null && (!Id.HasValue || existing.id != model.id))
+                {
+                    errorMessage = "El email ya está en uso por otro usuario.";
+                    return;
+                }
+            }
+
+            // Validar que si es reactivación, contraseña es obligatoria
+            if (isReactivating && string.IsNullOrEmpty(password))
+            {
+                errorMessage = "Por seguridad, debes establecer una nueva contraseña para reactivar este usuario.";
+                return;
+            }
+
+            // Si es nuevo usuario, contraseña también es obligatoria
+            if (!Id.HasValue && string.IsNullOrEmpty(password))
+            {
+                errorMessage = "La contraseña es obligatoria para un nuevo usuario.";
+                return;
+            }
+
+            // Si se proporciona contraseña, validar reglas (mínimo 5, al menos una letra y un número)
+            if (!string.IsNullOrEmpty(password) && !IsPasswordValid(password))
+            {
+                errorMessage = "La contraseña debe tener al menos 5 caracteres e incluir una letra y un número.";
+                return;
+            }
+
+            // Hash de contraseña si se proporciona
+            if (!string.IsNullOrEmpty(password))
+            {
+                model.password_hash = BCrypt.Net.BCrypt.HashPassword(password);
+            }
+
+            if (Id.HasValue)
+            {
+                await UserRepo.UpdateAsync(model);
+            }
+            else
+            {
+                var newId = await UserRepo.CreateAsync(model);
+            }
+
+            Navigation.NavigateTo("/users");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            await JS.InvokeVoidAsync("alert", ex.Message);
+        }
+    }
+
+    void Cancel() => Navigation.NavigateTo("/users");
+
+    private bool IsPasswordValid(string? pwd)
+    {
+        if (string.IsNullOrEmpty(pwd)) return false;
+        // Minimum 5 chars, at least one letter and one number
+        return Regex.IsMatch(pwd, @"^(?=.{5,}$)(?=.*[A-Za-z])(?=.*\d).+");
+    }
+}

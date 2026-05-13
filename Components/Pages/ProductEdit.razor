@@ -1,0 +1,120 @@
+@page "/products/new"
+@page "/products/{Id:int}"
+@inject BlazorInventario.Repositories.IProductsRepository ProductsRepo
+@inject BlazorInventario.Repositories.ICategoriesRepository CategoriesRepo
+@inject Microsoft.AspNetCore.Components.NavigationManager Navigation
+@inject Microsoft.JSInterop.IJSRuntime JS
+
+<PageTitle>Editar producto</PageTitle>
+
+<h3>@(Id.HasValue ? "Editar producto" : "Nuevo producto")</h3>
+
+<EditForm Model="model" OnValidSubmit="Save">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+    <div class="mb-3">
+        <label class="form-label">Nombre</label>
+        <InputText class="form-control" @bind-Value="model.name" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Categoría</label>
+        <select class="form-select" @bind="model.category_id">
+            <option value="">-- Sin categoría --</option>
+            @foreach (var c in categories)
+            {
+                <option value="@c.id">@c.name</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Stock mínimo</label>
+        <InputNumber class="form-control" @bind-Value="model.stock_minimum" />
+        <ValidationMessage For="@(() => model.stock_minimum)" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Costo promedio (solo al crear)</label>
+        <InputNumber class="form-control" @bind-Value="model.average_cost" Step="0.01" disabled="@(Id.HasValue)" />
+        @if (Id.HasValue)
+        {
+            <div class="form-text">No puede modificar el costo promedio de un producto existente. El costo se actualizará mediante movimientos de inventario.</div>
+        }
+        <ValidationMessage For="@(() => model.average_cost)" />
+    </div>
+
+    <button class="btn btn-primary" type="submit">Guardar</button>
+    <button class="btn btn-secondary ms-2" type="button" @onclick="Cancel">Cancelar</button>
+</EditForm>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    [CascadingParameter]
+    private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState> authenticationStateTask { get; set; } = default!;
+
+    private bool isAdmin;
+
+    private BlazorInventario.Repositories.ProductRecord model = new();
+    private IEnumerable<BlazorInventario.Repositories.CategoryRecord> categories = new List<BlazorInventario.Repositories.CategoryRecord>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await authenticationStateTask;
+        isAdmin = auth.User?.IsInRole("Admin") ?? false;
+        if (!Id.HasValue && !isAdmin)
+        {
+            // non-admins cannot create products
+            Navigation.NavigateTo("/products", true);
+            return;
+        }
+        categories = (await CategoriesRepo.GetAllAsync()).ToList();
+
+        if (Id.HasValue)
+        {
+            var r = await ProductsRepo.GetByIdAsync(Id.Value);
+            if (r != null) model = r;
+        }
+        else
+        {
+            model.stock_current = 0;
+            model.stock_minimum = 0;
+            model.average_cost = 0m;
+        }
+    }
+
+    private string? errorMessage;
+
+    async Task Save()
+    {
+        errorMessage = null;
+        try
+        {
+            if (Id.HasValue)
+            {
+                await ProductsRepo.UpdateAsync(model);
+            }
+            else
+            {
+                var newId = await ProductsRepo.CreateAsync(model);
+            }
+
+            Navigation.NavigateTo("/products");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    void Cancel() => Navigation.NavigateTo("/products");
+}

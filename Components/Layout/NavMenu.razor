@@ -1,0 +1,115 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@implements IDisposable
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand d-flex align-items-center" href="">
+            <i class="bi bi-box-seam fs-4 me-2 brand-icon" aria-hidden="true"></i>
+            <span class="brand-text">BlazorInventario</span>
+        </a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        @if (isAuthenticated)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-flex align-items-center" href="" Match="NavLinkMatch.All">
+                    <i class="bi bi-house-door-fill nav-icon" aria-hidden="true"></i>
+                    <span class="link-text">Inicio</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-flex align-items-center" href="products">
+                    <i class="bi bi-box-seam nav-icon" aria-hidden="true"></i>
+                    <span class="link-text">Productos</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-flex align-items-center" href="categories">
+                    <i class="bi bi-tags nav-icon" aria-hidden="true"></i>
+                    <span class="link-text">Categorías</span>
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-flex align-items-center" href="movements">
+                    <i class="bi bi-clock-history nav-icon" aria-hidden="true"></i>
+                    <span class="link-text">Movimientos</span>
+                </NavLink>
+            </div>
+
+            @if (isAdmin)
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link d-flex align-items-center" href="users">
+                        <i class="bi bi-people nav-icon" aria-hidden="true"></i>
+                        <span class="link-text">Usuarios</span>
+                    </NavLink>
+                </div>
+            }
+
+            <div class="nav-item px-3 mt-3">
+                <a class="nav-link d-flex align-items-center signout-link" href="#" @onclick="Logout">
+                    <i class="bi bi-box-arrow-right nav-icon" aria-hidden="true"></i>
+                    <span class="link-text">Cerrar sesión</span>
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link d-flex align-items-center" href="login">
+                    <i class="bi bi-box-arrow-in-right nav-icon" aria-hidden="true"></i>
+                    <span class="link-text">Inicio de Sesión</span>
+                </NavLink>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    [Microsoft.AspNetCore.Components.Inject]
+    private Microsoft.AspNetCore.Components.NavigationManager Navigation { get; set; } = default!;
+
+    [Microsoft.AspNetCore.Components.Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+
+    private bool isAuthenticated;
+    private bool isAdmin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = state.User?.Identity?.IsAuthenticated ?? false;
+        isAdmin = state.User?.IsInRole("Admin") ?? false;
+        AuthenticationStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+    }
+
+    private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    {
+        var state = await task;
+        isAuthenticated = state.User?.Identity?.IsAuthenticated ?? false;
+        isAdmin = state.User?.IsInRole("Admin") ?? false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private System.Threading.Tasks.Task Logout()
+    {
+        // Navigate the browser to /signout (GET) so the server's Set-Cookie response
+        // clears the authentication cookie in the browser and the page reloads.
+        Navigation.NavigateTo("/signout", true);
+        return System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        AuthenticationStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+    }
+}
+

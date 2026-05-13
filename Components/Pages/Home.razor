@@ -1,0 +1,148 @@
+@page "/"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Components.Authorization
+@inject BlazorInventario.Repositories.IProductsRepository ProductsRepo
+@inject BlazorInventario.Repositories.IMovementsRepository MovementsRepo
+@inject Microsoft.JSInterop.IJSRuntime JS
+@inject Microsoft.AspNetCore.Components.NavigationManager Navigation
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>Dashboard</h1>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Total productos</h5>
+                <p class="card-text display-6">@totalProducts</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Productos con stock bajo</h5>
+                <p class="card-text display-6">@lowStockCount</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Valor total del inventario</h5>
+                <p class="card-text display-6">@totalValue.ToString("C")</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Total Movimientos (últimos 12 meses)</h5>
+                <div style="height:300px; position: relative;">
+                    <canvas id="movementsMonthlyChart" style="width:100%; height:100%;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Entradas vs Salidas (últimos 12 meses)</h5>
+                <div style="height:300px; position: relative;">
+                    <canvas id="entriesVsExitsChart" style="width:100%; height:100%;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = default!;
+
+    private int totalProducts;
+    private int lowStockCount;
+    private decimal totalValue;
+
+    private List<BlazorInventario.Repositories.MovementRecord> movements = new();
+    private List<BlazorInventario.Repositories.ProductRecord> products = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await authenticationStateTask;
+        if (auth?.User?.Identity?.IsAuthenticated != true)
+        {
+            Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}", true);
+            return;
+        }
+
+        products = (await ProductsRepo.GetAllAsync()).ToList();
+        totalProducts = products.Count;
+        lowStockCount = products.Count(p => p.stock_current <= p.stock_minimum);
+        totalValue = products.Sum(p => p.stock_current * p.average_cost);
+
+        // load movements for last 12 months
+        var now = DateTime.UtcNow;
+        var start = new DateTime(now.Year, now.Month, 1).AddMonths(-11);
+        movements = (await MovementsRepo.GetByFiltersAsync(start, now, null, null)).ToList();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine($"OnAfterRenderAsync (firstRender={firstRender}): movements count = {movements.Count}");
+
+            // Espera para que Chart.js se cargue y los canvas estén listos
+            await Task.Delay(300);
+
+            // prepare monthly labels for last 12 months
+            var now = DateTime.UtcNow;
+            var months = new List<DateTime>();
+            for (int i = 11; i >= 0; i--)
+            {
+                months.Add(new DateTime(now.Year, now.Month, 1).AddMonths(-i));
+            }
+
+            var labels = months.Select(m => m.ToString("MMM yyyy")).ToArray();
+
+            // Movements per month (count)
+            var monthlyCounts = months.Select(m => movements.Count(x => x.date.Year == m.Year && x.date.Month == m.Month)).ToList();
+
+            System.Diagnostics.Debug.WriteLine($"Rendering charts with {labels.Length} labels");
+
+            try
+            {
+                await JS.InvokeAsync<object>("renderMonthlyMovementsChart", "movementsMonthlyChart", labels, monthlyCounts);
+            }
+            catch (Exception chex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Monthly chart error: {chex.Message}");
+            }
+
+            // Entries vs Exits per month (sum quantities)
+            var entries = months.Select(m => movements.Where(x => x.type == "in" && x.date.Year == m.Year && x.date.Month == m.Month).Sum(x => x.quantity)).ToArray();
+            var exits = months.Select(m => movements.Where(x => x.type == "out" && x.date.Year == m.Year && x.date.Month == m.Month).Sum(x => x.quantity)).ToArray();
+
+            try
+            {
+                await JS.InvokeAsync<object>("renderEntriesVsExitsChart", "entriesVsExitsChart", labels, entries, exits);
+            }
+            catch (Exception chex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Entries/Exits chart error: {chex.Message}");
+            }
+
+            System.Diagnostics.Debug.WriteLine("Charts rendered");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error rendering charts: {ex.Message}");
+        }
+    }
+}

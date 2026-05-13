@@ -1,0 +1,122 @@
+@page "/users"
+@attribute [Authorize(Roles = "Admin")]
+@inject BlazorInventario.Repositories.IUserRepository UserRepo
+@inject Microsoft.AspNetCore.Components.NavigationManager Navigation
+@inject Microsoft.JSInterop.IJSRuntime JS
+@inject BlazorInventario.Services.IUsersExportService UsersExportService
+
+<PageTitle>Usuarios</PageTitle>
+
+<h3>Usuarios</h3>
+
+<div class="d-flex mb-3">
+    <button class="btn btn-primary me-2" @onclick="Create" disabled="@isLoading">Nuevo usuario</button>
+    <button class="btn btn-outline-secondary" @onclick="ExportUsers" disabled="@isLoading">Exportar CSV</button>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Rol</th>
+                <th>Activo</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (users == null)
+            {
+                <tr><td colspan="5">Cargando...</td></tr>
+            }
+            else if (!users.Any())
+            {
+                <tr><td colspan="5">No hay usuarios.</td></tr>
+            }
+            else
+            {
+                @foreach (var u in users)
+                {
+                    <tr>
+                        <td>@u.name</td>
+                        <td>@u.email</td>
+                        <td>@u.role</td>
+                        <td>@(u.is_active ? "Sí" : "No")</td>
+                        <td class="text-nowrap">
+                            <div class="d-flex gap-1 flex-nowrap">
+                                <button class="btn btn-sm btn-secondary" @onclick="() => Edit(u.id)">Editar</button>
+                                @if (u.is_active)
+                                {
+                                    <button class="btn btn-sm btn-danger" @onclick="() => Deactivate(u.id)">Desactivar</button>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<BlazorInventario.Repositories.UserRecord>? users;
+    private string? errorMessage;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            users = (await UserRepo.GetAllAsync()).ToList();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    void Create() => Navigation.NavigateTo("/users/new");
+    void Edit(int id) => Navigation.NavigateTo($"/users/{id}");
+
+    async Task Deactivate(int id)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", "¿Confirma desactivar este usuario?");
+        if (!ok) return;
+
+        try
+        {
+            await UserRepo.DeactivateAsync(id);
+            users = (await UserRepo.GetAllAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    async Task ExportUsers()
+    {
+        isLoading = true;
+        try
+        {
+            var bytes = await UsersExportService.GenerateUsersCsvAsync();
+            var base64 = Convert.ToBase64String(bytes);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", "usuarios.csv", base64);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

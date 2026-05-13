@@ -1,0 +1,87 @@
+@page "/categories/new"
+@page "/categories/{Id:int}"
+@inject BlazorInventario.Repositories.ICategoriesRepository CategoriesRepo
+@inject Microsoft.AspNetCore.Components.NavigationManager Navigation
+@inject Microsoft.JSInterop.IJSRuntime JS
+
+<PageTitle>Editar categoría</PageTitle>
+
+<h3>@(Id.HasValue ? "Editar categoría" : "Nueva categoría")</h3>
+
+<EditForm Model="model" OnValidSubmit="Save">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+    <div class="mb-3">
+        <label class="form-label">Nombre</label>
+        <InputText class="form-control" @bind-Value="model.name" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Descripción</label>
+        <InputTextArea class="form-control" @bind-Value="model.description" />
+    </div>
+
+    <button class="btn btn-primary" type="submit">Guardar</button>
+    <button class="btn btn-secondary ms-2" type="button" @onclick="Cancel">Cancelar</button>
+</EditForm>
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    [CascadingParameter]
+    private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState> authenticationStateTask { get; set; } = default!;
+
+    private bool isAdmin;
+
+    private BlazorInventario.Repositories.CategoryRecord model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await authenticationStateTask;
+        isAdmin = auth.User?.IsInRole("Admin") ?? false;
+        if (!Id.HasValue && !isAdmin)
+        {
+            // non-admins cannot create categories
+            Navigation.NavigateTo("/categories", true);
+            return;
+        }
+        if (Id.HasValue)
+        {
+            var r = await CategoriesRepo.GetByIdAsync(Id.Value);
+            if (r != null) model = r;
+        }
+    }
+
+    private string? errorMessage;
+
+    async Task Save()
+    {
+        errorMessage = null;
+        try
+        {
+            if (Id.HasValue)
+            {
+                await CategoriesRepo.UpdateAsync(model);
+            }
+            else
+            {
+                var newId = await CategoriesRepo.CreateAsync(model);
+            }
+            Navigation.NavigateTo("/categories");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+    }
+
+    void Cancel() => Navigation.NavigateTo("/categories");
+}

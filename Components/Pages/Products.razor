@@ -1,0 +1,189 @@
+@page "/products"
+@attribute [Authorize]
+@inject BlazorInventario.Repositories.IProductsRepository ProductsRepo
+@inject BlazorInventario.Repositories.ICategoriesRepository CategoriesRepo
+@inject Microsoft.AspNetCore.Components.NavigationManager Navigation
+@using Microsoft.AspNetCore.Components.Authorization
+@inject Microsoft.JSInterop.IJSRuntime JS
+@inject BlazorInventario.Services.IProductsExportService ProductsExportService
+
+<PageTitle>Productos</PageTitle>
+
+<h3>Productos</h3>
+
+@if (isAdmin)
+{
+    <button class="btn btn-primary mb-3" @onclick="Create" disabled="@isLoading">Nuevo producto</button>
+}
+<button class="btn btn-outline-secondary mb-3 ms-2" @onclick="ExportCsv" disabled="@isLoading">Exportar CSV</button>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+            <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Categoría</th>
+            <th>Stock</th>
+            <th>Stock mínimo</th>
+            <th>Costo promedio</th>
+            <th class="col-actions">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (isLoading)
+        {
+            if (showPlaceholder)
+            {
+                @for (int i = 0; i < pageSize; i++)
+                {
+                    <tr>
+                        <td><span class="placeholder col-8 placeholder-glow"></span></td>
+                        <td><span class="placeholder col-6 placeholder-glow"></span></td>
+                        <td><span class="placeholder col-3 placeholder-glow"></span></td>
+                        <td><span class="placeholder col-3 placeholder-glow"></span></td>
+                        <td><span class="placeholder col-4 placeholder-glow"></span></td>
+                        <td><span class="actions-placeholder"></span></td>
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr><td colspan="6">Cargando...</td></tr>
+            }
+        }
+        else if (!products.Any())
+        {
+            <tr><td colspan="6">No hay productos.</td></tr>
+        }
+        else
+        {
+            @foreach (var p in PagedProducts)
+            {
+                <tr class="@(p.stock_current <= p.stock_minimum ? "table-warning" : "")">
+                    <td>@p.name</td>
+                    <td>@GetCategoryName(p.category_id)</td>
+                    <td>@p.stock_current</td>
+                    <td>@p.stock_minimum</td>
+                    <td>@p.average_cost.ToString("C")</td>
+                    <td class="text-nowrap">
+                        <div class="d-flex gap-1 flex-nowrap">
+                            <button class="btn btn-sm btn-secondary" @onclick="() => Edit(p.id)">Editar</button>
+                            @if (isAdmin)
+                            {
+                                <button class="btn btn-sm btn-danger" @onclick="() => MarkInactive(p.id)">Baja</button>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+    </table>
+</div>
+
+<nav aria-label="Paginación" class="mt-3">
+    <ul class="pagination justify-content-center">
+        <li class="page-item @(CurrentPage == 1 ? "disabled" : "")">
+            <button class="page-link" @onclick="PrevPage" disabled="@(CurrentPage == 1)">Anterior</button>
+        </li>
+        <li class="page-item active"><span class="page-link">Página @CurrentPage de @TotalPages</span></li>
+        <li class="page-item @(CurrentPage == TotalPages ? "disabled" : "")">
+            <button class="page-link" @onclick="NextPage" disabled="@(CurrentPage == TotalPages)">Siguiente</button>
+        </li>
+    </ul>
+</nav>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = default!;
+    private bool isAdmin;
+    // QuickGrid requires IQueryable when using Pagination
+    private List<BlazorInventario.Repositories.ProductRecord> products = new();
+    private List<BlazorInventario.Repositories.CategoryRecord> categories = new();
+    private string? errorMessage;
+    private int currentPage = 1;
+    private int pageSize = 10;
+    private bool isLoading = true;
+    private bool showPlaceholder = false;
+
+    int TotalPages => Math.Max(1, (int)Math.Ceiling(products.Count / (double)pageSize));
+    int CurrentPage => currentPage;
+    IEnumerable<BlazorInventario.Repositories.ProductRecord> PagedProducts => products.Skip((currentPage - 1) * pageSize).Take(pageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authenticationStateTask;
+        if (authState?.User?.Identity?.IsAuthenticated != true)
+        {
+            Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(Navigation.Uri)}", true);
+            return;
+        }
+
+        isAdmin = authState.User?.IsInRole("Admin") ?? false;
+
+        var fetchTask = Task.Run(async () =>
+        {
+            products = (await ProductsRepo.GetAllAsync()).ToList();
+            categories = (await CategoriesRepo.GetAllAsync()).ToList();
+        });
+
+        var delayTask = Task.Delay(150);
+        var first = await Task.WhenAny(fetchTask, delayTask);
+        if (first == delayTask) showPlaceholder = true;
+
+        await fetchTask;
+        isLoading = false;
+        showPlaceholder = false;
+    }
+
+    // QuickGrid handles paging via PaginationState
+
+    string? GetCategoryName(int? id)
+    {
+        return categories.FirstOrDefault(c => c.id == id)?.name;
+    }
+
+    void Create() => Navigation.NavigateTo("/products/new");
+    void Edit(int id) => Navigation.NavigateTo($"/products/{id}");
+
+    async Task MarkInactive(int id)
+    {
+        errorMessage = null;
+        try
+        {
+            var ok = await JS.InvokeAsync<bool>("confirm", "¿Confirma dar de baja este producto?");
+            if (!ok) return;
+
+            await ProductsRepo.MarkAsInactiveAsync(id);
+            products = (await ProductsRepo.GetAllAsync()).ToList();
+            if (currentPage > TotalPages) currentPage = TotalPages;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    void PrevPage() { if (currentPage > 1) currentPage--; }
+    void NextPage() { if (currentPage < TotalPages) currentPage++; }
+
+    async Task ExportCsv()
+    {
+        try
+        {
+            var bytes = await ProductsExportService.GenerateProductsCsvAsync();
+            var base64 = Convert.ToBase64String(bytes);
+            await JS.InvokeVoidAsync("downloadFileFromBase64", "products.csv", base64);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+}

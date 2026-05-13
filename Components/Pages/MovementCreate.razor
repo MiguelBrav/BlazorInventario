@@ -1,0 +1,130 @@
+@page "/movements/new"
+@attribute [Authorize]
+@inject BlazorInventario.Repositories.IProductsRepository ProductsRepo
+@inject BlazorInventario.Services.IInventoryService InventoryService
+@inject Microsoft.AspNetCore.Components.NavigationManager Navigation
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+
+<PageTitle>Nueva operación</PageTitle>
+
+<h3>Nueva operación</h3>
+
+<EditForm Model="model" OnValidSubmit="Submit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
+
+    <div class="mb-3">
+        <label class="form-label">Producto</label>
+        <select class="form-select" @bind="model.product_id">
+            <option value="0">-- Selecciona --</option>
+            @foreach (var p in products)
+            {
+                <option value="@p.id">@p.name</option>
+            }
+        </select>
+        <ValidationMessage For="@(() => model.product_id)" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Tipo</label>
+        <select class="form-select" @bind="model.type">
+            <option value="in">Entrada</option>
+            <option value="out">Salida</option>
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Cantidad</label>
+        <InputNumber class="form-control" @bind-Value="model.quantity" />
+        <ValidationMessage For="@(() => model.quantity)" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Costo unitario (solo para entradas)</label>
+        <InputNumber class="form-control" @bind-Value="model.unit_cost" Step="0.01" disabled="@(model.type == "out")" />
+        @if (model.type == "out" && model.product_id > 0)
+        {
+            var prod = products.FirstOrDefault(p => p.id == model.product_id);
+            <div class="form-text">Costo usado para salidas: @((prod?.average_cost ?? 0m).ToString("C"))</div>
+        }
+        <ValidationMessage For="@(() => model.unit_cost)" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Notas</label>
+        <InputTextArea class="form-control" @bind-Value="model.notes" />
+    </div>
+
+    <button class="btn btn-primary" type="submit" disabled="@isSubmitting">
+        @if (isSubmitting)
+        {
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            <span class="ms-1">Guardando...</span>
+        }
+        else
+        {
+            <span>Guardar operación</span>
+        }
+    </button>
+    <button class="btn btn-secondary ms-2" type="button" @onclick="Cancel" disabled="@isSubmitting">Cancelar</button>
+</EditForm>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = default!;
+
+    private BlazorInventario.Repositories.MovementRecord model = new() { date = DateTime.Now, type = "in", quantity = 1, unit_cost = 0m };
+    private List<BlazorInventario.Repositories.ProductRecord> products = new();
+    private bool isSubmitting = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = (await ProductsRepo.GetAllAsync()).ToList();
+    }
+
+    async Task Submit()
+    {
+        errorMessage = null;
+        isSubmitting = true;
+        try
+        {
+            var authState = await authenticationStateTask;
+            var user = authState.User;
+            if (user?.Identity?.IsAuthenticated == true)
+            {
+                var idClaim = user.FindFirst(ClaimTypes.NameIdentifier) ?? user.FindFirst("sub") ?? user.FindFirst("id");
+                if (idClaim != null && int.TryParse(idClaim.Value, out var uid)) model.user_id = uid;
+            }
+
+            if (model.type == "in")
+            {
+                await InventoryService.CreateEntryAsync(model);
+            }
+            else
+            {
+                var prod = products.FirstOrDefault(p => p.id == model.product_id);
+                model.unit_cost = prod?.average_cost ?? 0m;
+                await InventoryService.CreateExitAsync(model);
+            }
+
+            Navigation.NavigateTo("/movements");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    void Cancel() => Navigation.NavigateTo("/movements");
+}

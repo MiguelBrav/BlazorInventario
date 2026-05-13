@@ -1,0 +1,38 @@
+@page "/login"
+@using Microsoft.AspNetCore.WebUtilities
+@inject Microsoft.AspNetCore.Components.NavigationManager Navigation
+
+<PageTitle>Inicio de Sesión</PageTitle>
+
+<h3>Inicio de Sesión</h3>
+
+@if (failed)
+{
+    <div class="alert alert-danger">Credenciales inválidas.</div>
+}
+
+<!-- Use a normal HTML form POST so the browser receives the Set-Cookie header from /signin -->
+<form method="post" action="/signin">
+    <div class="mb-3">
+        <label>Usuario</label>
+        <input name="username" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label>Contraseña</label>
+        <input name="password" type="password" class="form-control" />
+    </div>
+
+    <button class="btn btn-primary" type="submit">Iniciar sesión</button>
+</form>
+
+@code {
+    private bool failed;
+
+    protected override void OnInitialized()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var qp = QueryHelpers.ParseQuery(uri.Query);
+        failed = qp.TryGetValue("failed", out var v) && v == "1";
+    }
+}
