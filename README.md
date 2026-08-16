@@ -43,6 +43,20 @@ Credenciales de prueba:
 
 ---
 
+## Ejemplo de uso
+
+You can checkout the project here: "https://inventario.segurab.com/"
+
+![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1786918988/BlazorInventario/01-Inicio_mm40dw.png)
+
+![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1786918923/BlazorInventario/02-Productos_gsv5ge.png)
+
+![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1786918939/BlazorInventario/03-Categorias_wks0hy.png)
+
+![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1786918938/BlazorInventario/04-Movimientos_xp8kyr.png)
+
+![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1786918921/BlazorInventario/05-Usuarios_vbstyb.png)
+
 ## Productos incluidos en la demo
 - Coca-Cola 600 ml — Categoría: Bebidas  
   Refresco carbonatado sabor cola en presentación de 600 ml, ideal para consumo individual.
