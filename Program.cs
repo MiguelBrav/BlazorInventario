@@ -7,8 +7,16 @@ using BlazorInventario.Repositories;
 using BlazorInventario.Services;
 using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Components.Authorization;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Location
+var cultureInfo = new CultureInfo("es-MX");
+CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
+CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
+
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Server=localhost;Database=mininventary;User=root;Password=pass;";
@@ -70,6 +78,15 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 app.UseHttpsRedirection();
 
 app.UseAntiforgery();
+
+// Localización
+app.UseRequestLocalization(options =>
+{
+    var supportedCultures = new[] { new CultureInfo("es-MX") };
+    options.DefaultRequestCulture = new Microsoft.AspNetCore.Localization.RequestCulture("es-MX");
+    options.SupportedCultures = supportedCultures;
+    options.SupportedUICultures = supportedCultures;
+});
 
 // Authentication / Authorization
 app.UseAuthentication();

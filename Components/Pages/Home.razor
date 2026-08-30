@@ -3,45 +3,131 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @inject BlazorInventario.Repositories.IProductsRepository ProductsRepo
 @inject BlazorInventario.Repositories.IMovementsRepository MovementsRepo
+@inject BlazorInventario.Repositories.IUserRepository UsersRepo
 @inject Microsoft.JSInterop.IJSRuntime JS
 @inject Microsoft.AspNetCore.Components.NavigationManager Navigation
 
-<PageTitle>Dashboard</PageTitle>
+<PageTitle>Dashboard - Centro de Control</PageTitle>
 
-<h1>Dashboard</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-speedometer2 me-2"></i>Centro de Control</h1>
+    <span class="text-muted">@DateTime.Now.ToString("dddd, dd MMMM yyyy", new System.Globalization.CultureInfo("es-MX"))</span>
+</div>
 
+<!-- Main KPI Cards -->
 <div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card">
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm bg-primary text-white h-100">
             <div class="card-body">
-                <h5 class="card-title">Total productos</h5>
-                <p class="card-text display-6">@totalProducts</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">Valor Inventario</h6>
+                        <p class="card-text display-6 fw-bold mb-0">@totalValue.ToString("C", new System.Globalization.CultureInfo("es-MX"))</p>
+                    </div>
+                    <i class="bi bi-currency-dollar fs-1 opacity-50"></i>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm bg-success text-white h-100">
             <div class="card-body">
-                <h5 class="card-title">Productos con stock bajo</h5>
-                <p class="card-text display-6">@lowStockCount</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">Productos Activos</h6>
+                        <p class="card-text display-6 fw-bold mb-0">@totalProducts</p>
+                    </div>
+                    <i class="bi bi-box-seam fs-1 opacity-50"></i>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card">
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm bg-warning text-dark h-100">
             <div class="card-body">
-                <h5 class="card-title">Valor total del inventario</h5>
-                <p class="card-text display-6">@totalValue.ToString("C")</p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">Stock Bajo</h6>
+                        <p class="card-text display-6 fw-bold mb-0">@lowStockCount</p>
+                    </div>
+                    <i class="bi bi-exclamation-triangle fs-1 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card border-0 shadow-sm bg-danger text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">Agotados</h6>
+                        <p class="card-text display-6 fw-bold mb-0">@outOfStockCount</p>
+                    </div>
+                    <i class="bi bi-x-circle fs-1 opacity-50"></i>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
+<!-- Monthly metrics -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <h5 class="card-title">Total Movimientos (últimos 12 meses)</h5>
+                <h6 class="card-title text-muted mb-3"><i class="bi bi-graph-up me-2"></i>Actividad del Mes</h6>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-success me-2">ENTRADAS</span>
+                            <span class="fw-bold">@monthEntriesCount</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-danger me-2">SALIDAS</span>
+                            <span class="fw-bold">@monthExitsCount</span>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="text-muted me-2"><i class="bi bi-currency-dollar me-1"></i>Compras:</span>
+                            <span class="fw-bold text-success">@monthPurchaseValue.ToString("C", new System.Globalization.CultureInfo("es-MX"))</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="text-muted me-2"><i class="bi bi-people me-1"></i>Usuarios:</span>
+                            <span class="fw-bold">@activeUsersCount</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="card-title text-muted mb-3"><i class="bi bi-pie-chart me-2"></i>Resumen de Stock</h6>
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: @normalStockPercentage%" aria-valuenow="@normalStockCount" aria-valuemin="0" aria-valuemax="@totalProducts">
+                        Normal: @normalStockCount
+                    </div>
+                    <div class="progress-bar bg-warning" role="progressbar" style="width: @lowStockPercentage%" aria-valuenow="@lowStockCount" aria-valuemin="0" aria-valuemax="@totalProducts">
+                        Bajo: @lowStockCount
+                    </div>
+                    <div class="progress-bar bg-danger" role="progressbar" style="width: @outOfStockPercentage%" aria-valuenow="@outOfStockCount" aria-valuemin="0" aria-valuemax="@totalProducts">
+                        Agotado: @outOfStockCount
+                    </div>
+                </div>
+                <small class="text-muted">Distribución del estado del inventario</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main charts -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-bar-chart me-2"></i>Movimientos últimos 30 días</h5>
                 <div style="height:300px; position: relative;">
                     <canvas id="movementsMonthlyChart" style="width:100%; height:100%;"></canvas>
                 </div>
@@ -49,13 +135,114 @@
         </div>
     </div>
 
-    <div class="col-md-6 mb-4">
-        <div class="card h-100">
+    <div class="col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
-                <h5 class="card-title">Entradas vs Salidas (últimos 12 meses)</h5>
+                <h5 class="card-title"><i class="bi bi-graph-up me-2"></i>Entradas vs Salidas (últimos 12 meses)</h5>
                 <div style="height:300px; position: relative;">
                     <canvas id="entriesVsExitsChart" style="width:100%; height:100%;"></canvas>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Most moved products and recent movements -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-trophy me-2"></i>Productos Más Movidos</h5>
+                @if (topProducts.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th class="text-center">Movimientos</th>
+                                    <th class="text-center">Stock</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var product in topProducts.Take(5))
+                                {
+                                    <tr>
+                                        <td>@product.name</td>
+                                        <td class="text-center">
+                                            <span class="badge bg-primary">@product.movementCount</span>
+                                        </td>
+                                        <td class="text-center">
+                                            @if (product.stock_current == 0)
+                                            {
+                                                <span class="badge bg-danger">0</span>
+                                            }
+                                            else if (product.stock_current <= product.stock_minimum)
+                                            {
+                                                <span class="badge bg-warning text-dark">@product.stock_current</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-success">@product.stock_current</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted text-center py-3">No hay datos disponibles</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-clock-history me-2"></i>Últimos Movimientos</h5>
+                @if (recentMovements.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Tipo</th>
+                                    <th>Producto</th>
+                                    <th class="text-center">Cantidad</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var movement in recentMovements.Take(5))
+                                {
+                                    <tr>
+                                        <td>@movement.date.ToString("dd/MM/yyyy")</td>
+                                        <td>
+                                            @if (movement.type == "in")
+                                            {
+                                                <span class="badge bg-success">ENTRADA</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">SALIDA</span>
+                                            }
+                                        </td>
+                                        <td>@movement.product_name</td>
+                                        <td class="text-center fw-bold">@movement.quantity</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted text-center py-3">No hay movimientos recientes</p>
+                }
             </div>
         </div>
     </div>
@@ -65,12 +252,49 @@
     [CascadingParameter]
     private Task<AuthenticationState> authenticationStateTask { get; set; } = default!;
 
+    // Main metrics
     private int totalProducts;
     private int lowStockCount;
+    private int outOfStockCount;
+    private int normalStockCount;
     private decimal totalValue;
 
+    // Monthly metrics
+    private int monthEntriesCount;
+    private int monthExitsCount;
+    private decimal monthPurchaseValue;
+    private int activeUsersCount;
+
+    // Percentages for progress bar
+    private double normalStockPercentage;
+    private double lowStockPercentage;
+    private double outOfStockPercentage;
+
+    // Data for tables
     private List<BlazorInventario.Repositories.MovementRecord> movements = new();
     private List<BlazorInventario.Repositories.ProductRecord> products = new();
+    private List<BlazorInventario.Repositories.UserRecord> users = new();
+
+    // Helper classes for complex data
+    private class ProductMovementInfo
+    {
+        public int id { get; set; }
+        public string? name { get; set; }
+        public int movementCount { get; set; }
+        public int stock_current { get; set; }
+        public int stock_minimum { get; set; }
+    }
+
+    private class MovementWithProductName
+    {
+        public DateTime date { get; set; }
+        public string? type { get; set; }
+        public int quantity { get; set; }
+        public string? product_name { get; set; }
+    }
+
+    private List<ProductMovementInfo> topProducts = new();
+    private List<MovementWithProductName> recentMovements = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -81,15 +305,77 @@
             return;
         }
 
+        // Load all necessary data
         products = (await ProductsRepo.GetAllAsync()).ToList();
+        users = (await UsersRepo.GetAllAsync()).ToList();
+
+        var now = DateTime.UtcNow;
+        var monthStart = new DateTime(now.Year, now.Month, 1);
+        var start = new DateTime(now.Year, now.Month, 1).AddMonths(-11);
+
+        movements = (await MovementsRepo.GetByFiltersAsync(start, now, null, null)).ToList();
+        var monthMovements = movements.Where(m => m.date >= monthStart).ToList();
+        var recentMovementsList = (await MovementsRepo.GetRecentAsync(10)).ToList();
+
+        // Calculate main metrics
         totalProducts = products.Count;
-        lowStockCount = products.Count(p => p.stock_current <= p.stock_minimum);
+        lowStockCount = products.Count(p => p.stock_current > 0 && p.stock_current <= p.stock_minimum);
+        outOfStockCount = products.Count(p => p.stock_current == 0);
+        normalStockCount = totalProducts - lowStockCount - outOfStockCount;
         totalValue = products.Sum(p => p.stock_current * p.average_cost);
 
-        // load movements for last 12 months
-        var now = DateTime.UtcNow;
-        var start = new DateTime(now.Year, now.Month, 1).AddMonths(-11);
-        movements = (await MovementsRepo.GetByFiltersAsync(start, now, null, null)).ToList();
+        // Calculate percentages for progress bar
+        if (totalProducts > 0)
+        {
+            normalStockPercentage = (double)normalStockCount / totalProducts * 100;
+            lowStockPercentage = (double)lowStockCount / totalProducts * 100;
+            outOfStockPercentage = (double)outOfStockCount / totalProducts * 100;
+        }
+
+        // Calculate monthly metrics
+        monthEntriesCount = monthMovements.Count(m => m.type == "in");
+        monthExitsCount = monthMovements.Count(m => m.type == "out");
+        monthPurchaseValue = monthMovements
+            .Where(m => m.type == "in")
+            .Sum(m => m.quantity * m.unit_cost);
+        activeUsersCount = users.Count(u => u.is_active);
+
+        // Calculate most moved products
+        var productMovements = movements
+            .GroupBy(m => m.product_id)
+            .Select(g => new ProductMovementInfo
+            {
+                id = g.Key,
+                movementCount = g.Count(),
+                stock_current = products.FirstOrDefault(p => p.id == g.Key)?.stock_current ?? 0,
+                stock_minimum = products.FirstOrDefault(p => p.id == g.Key)?.stock_minimum ?? 0
+            })
+            .OrderByDescending(p => p.movementCount)
+            .ToList();
+
+        // Assign product names
+        foreach (var pm in productMovements)
+        {
+            var product = products.FirstOrDefault(p => p.id == pm.id);
+            if (product != null)
+            {
+                pm.name = product.name;
+            }
+        }
+
+        topProducts = productMovements;
+
+        // Prepare recent movements with product names
+        recentMovements = recentMovementsList
+            .Select(m => new MovementWithProductName
+            {
+                date = m.date,
+                type = m.type,
+                quantity = m.quantity,
+                product_name = products.FirstOrDefault(p => p.id == m.product_id)?.name ?? "Unknown"
+            })
+            .OrderByDescending(m => m.date)
+            .ToList();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -98,10 +384,10 @@
         {
             System.Diagnostics.Debug.WriteLine($"OnAfterRenderAsync (firstRender={firstRender}): movements count = {movements.Count}");
 
-            // Espera para que Chart.js se cargue y los canvas estén listos
+            // Wait for Chart.js to load and canvas to be ready
             await Task.Delay(300);
 
-            // prepare monthly labels for last 12 months
+            // Prepare monthly labels for last 12 months
             var now = DateTime.UtcNow;
             var months = new List<DateTime>();
             for (int i = 11; i >= 0; i--)
@@ -109,7 +395,7 @@
                 months.Add(new DateTime(now.Year, now.Month, 1).AddMonths(-i));
             }
 
-            var labels = months.Select(m => m.ToString("MMM yyyy")).ToArray();
+            var labels = months.Select(m => m.ToString("MMM yyyy", new System.Globalization.CultureInfo("es-MX"))).ToArray();
 
             // Movements per month (count)
             var monthlyCounts = months.Select(m => movements.Count(x => x.date.Year == m.Year && x.date.Month == m.Month)).ToList();
