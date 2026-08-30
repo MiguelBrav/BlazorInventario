@@ -47,7 +47,7 @@ Credenciales de prueba:
 
 You can checkout the project here: "https://inventario.segurab.com/"
 
-![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1786918988/BlazorInventario/01-Inicio_mm40dw.png)
+![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1788128483/BlazorInventario/Inventario01-2_co0y34.png)
 
 ![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1786918923/BlazorInventario/02-Productos_gsv5ge.png)
 
@@ -64,6 +64,8 @@ You can checkout the project here: "https://inventario.segurab.com/"
   Papas fritas sabor original en bolsa de 45 g, perfectas para un snack o acompañar comidas.
 - Chocolate Carlos V 20 g — Categoría: Dulces y Chocolates  
   Barra de chocolate con leche de 20 g, un clásico para disfrutar como postre o antojo.
+- Mazapan 50 gr
+  Dulce típico Mexicano
 
 ---
 
