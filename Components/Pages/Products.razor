@@ -73,6 +73,7 @@
                     <td class="text-nowrap">
                         <div class="d-flex gap-1 flex-nowrap">
                             <button class="btn btn-sm btn-secondary" @onclick="() => Edit(p.id)">Editar</button>
+                            <button class="btn btn-sm btn-info" @onclick="() => ViewKardex(p.id)">Kardex</button>
                             @if (isAdmin)
                             {
                                 <button class="btn btn-sm btn-danger" @onclick="() => MarkInactive(p.id)">Baja</button>
@@ -150,6 +151,7 @@
 
     void Create() => Navigation.NavigateTo("/products/new");
     void Edit(int id) => Navigation.NavigateTo($"/products/{id}");
+    void ViewKardex(int id) => Navigation.NavigateTo($"/kardex?productId={id}");
 
     async Task MarkInactive(int id)
     {

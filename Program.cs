@@ -63,6 +63,8 @@ builder.Services.AddScoped<BlazorInventario.Services.IProductsExportService, Bla
 builder.Services.AddScoped<BlazorInventario.Services.ICategoriesExportService, BlazorInventario.Services.CategoriesExportService>();
 // Users export
 builder.Services.AddScoped<BlazorInventario.Services.IUsersExportService, BlazorInventario.Services.UsersExportService>();
+// Kardex export
+builder.Services.AddScoped<BlazorInventario.Services.IKardexExportService, BlazorInventario.Services.KardexExportService>();
 
 // Application build
 var app = builder.Build();

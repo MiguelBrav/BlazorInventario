@@ -23,25 +23,25 @@
     </div>
     <div class="col-md-3">
         <label>Producto</label>
-        <select class="form-select" @bind="productId">
-            <option value="">-- Todos --</option>
+        <select class="form-select" @onchange="HandleProductChange">
+            <option value="" selected="@((productId == null))">-- Todos --</option>
             @foreach (var p in products)
             {
-                <option value="@p.id">@p.name</option>
+                <option value="@p.id" selected="@((productId == p.id))">@p.name</option>
             }
         </select>
     </div>
     <div class="col-md-3">
         <label>Tipo</label>
-        <select class="form-select" @bind="type">
-            <option value="">-- Todos --</option>
-            <option value="in">Entrada</option>
-            <option value="out">Salida</option>
+        <select class="form-select" @onchange="HandleTypeChange">
+            <option value="" selected="@((type == null))">-- Todos --</option>
+            <option value="in" selected="@((type == "in"))">Entrada</option>
+            <option value="out" selected="@((type == "out"))">Salida</option>
         </select>
     </div>
 </div>
 
-<button class="btn btn-primary mb-3" @onclick="Filter" disabled="@isLoading">Filtrar</button>
+<button class="btn btn-primary mb-3" @onclick="Filter" disabled="@isLoading">Buscar</button>
 <button class="btn btn-success mb-3 ms-2" @onclick="New" disabled="@isLoading">Nueva operación</button>
 <button class="btn btn-outline-secondary mb-3 ms-2" @onclick="ExportCsv" disabled="@isLoading">Exportar CSV</button>
 
@@ -194,6 +194,26 @@
     }
 
     string? GetProductName(int id) => products.FirstOrDefault(p => p.id == id)?.name;
+
+    async Task HandleProductChange(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (int.TryParse(value, out int parsedProductId))
+        {
+            productId = parsedProductId;
+        }
+        else
+        {
+            productId = null;
+        }
+        await Filter();
+    }
+
+    async Task HandleTypeChange(ChangeEventArgs e)
+    {
+        type = e.Value?.ToString();
+        await Filter();
+    }
 
     async Task Filter()
     {

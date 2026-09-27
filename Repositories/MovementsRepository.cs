@@ -207,5 +207,112 @@ namespace BlazorInventario.Repositories
             var cnt = await conn.ExecuteScalarAsync<int>(sql, new { ProductId = productId });
             return cnt > 0;
         }
+
+        public async Task<IEnumerable<KardexRecord>> GetKardexAsync(int productId, DateTime? from, DateTime? to, string? type, int page, int pageSize)
+        {
+            using var conn = _factory.CreateConnection();
+            conn.Open();
+
+            var offset = (page - 1) * pageSize;
+
+            // Get product initial state
+            var product = await conn.QuerySingleOrDefaultAsync("SELECT stock_current, average_cost FROM products WHERE id = @Id", new { Id = productId });
+            int currentStock = product?.stock_current ?? 0;
+            decimal currentAvg = product?.average_cost ?? 0m;
+            
+            // Get all movements for the period (ordered chronologically)
+            var sql = @"SELECT m.id, m.date, m.type, m.quantity, m.unit_cost, m.notes, 
+                              IFNULL(m.canceled,0) AS canceled,
+                              u.name AS user_name,
+                              s.name AS supplier_name
+                       FROM movements m
+                       LEFT JOIN users u ON m.user_id = u.id
+                       LEFT JOIN suppliers s ON m.supplier_id = s.id
+                       WHERE m.product_id = @ProductId";
+
+            var parameters = new DynamicParameters();
+            parameters.Add("ProductId", productId);
+
+            if (from.HasValue)
+            {
+                sql += " AND m.date >= @From";
+                parameters.Add("From", from.Value);
+            }
+            if (to.HasValue)
+            {
+                sql += " AND m.date <= @To";
+                parameters.Add("To", to.Value);
+            }
+            if (!string.IsNullOrEmpty(type))
+            {
+                sql += " AND m.type = @Type";
+                parameters.Add("Type", type);
+            }
+
+            sql += " ORDER BY m.date ASC";
+
+            var allMovements = (await conn.QueryAsync<KardexRecord>(sql, parameters)).ToList();
+
+            // Calculate running totals starting from current state and working backwards
+            int runningStock = currentStock;
+            decimal runningAvg = currentAvg;
+
+            // Process in reverse order (from newest to oldest) to calculate running totals
+            foreach (var m in allMovements.AsEnumerable().Reverse())
+            {
+                m.running_stock = runningStock;
+                m.running_average_cost = runningAvg;
+
+                if (!m.canceled)
+                {
+                    if (m.type == "in")
+                    {
+                        // Reverse the entry: subtract quantity and cost contribution
+                        var newStock = runningStock - m.quantity;
+                        if (newStock > 0)
+                        {
+                            runningAvg = ((runningStock * runningAvg) - (m.quantity * m.unit_cost)) / newStock;
+                        }
+                        runningStock = newStock;
+                    }
+                    else if (m.type == "out")
+                    {
+                        // Reverse the exit: add quantity back
+                        runningStock += m.quantity;
+                    }
+                }
+            }
+
+            // Return in descending order (newest first) for display
+            return allMovements.OrderByDescending(m => m.date).Skip(offset).Take(pageSize);
+        }
+
+        public async Task<int> GetKardexCountAsync(int productId, DateTime? from, DateTime? to, string? type)
+        {
+            using var conn = _factory.CreateConnection();
+            conn.Open();
+
+            var sql = @"SELECT COUNT(*) FROM movements WHERE product_id = @ProductId";
+            var parameters = new DynamicParameters();
+            parameters.Add("ProductId", productId);
+
+            if (from.HasValue)
+            {
+                sql += " AND date >= @From";
+                parameters.Add("From", from.Value);
+            }
+            if (to.HasValue)
+            {
+                sql += " AND date <= @To";
+                parameters.Add("To", to.Value);
+            }
+            if (!string.IsNullOrEmpty(type))
+            {
+                sql += " AND type = @Type";
+                parameters.Add("Type", type);
+            }
+
+            return await conn.ExecuteScalarAsync<int>(sql, parameters);
+        }
     }
 }

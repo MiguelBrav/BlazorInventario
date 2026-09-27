@@ -5,8 +5,9 @@ Aplicación Blazor (componentes interactivos, Server) para gestión básica de i
 ### Características principales
 - Gestión de categorías, productos y movimientos (entradas/salidas).
 - Autenticación por cookies (endpoints `/signin` y `/signout`).
-- Exportación CSV para productos, categorías, movimientos y usuarios.
+- Exportación CSV para productos, categorías, movimientos, usuarios y kardex.
 - Dashboard con métricas y gráficos (Chart.js desde JS interop).
+- Kardex de inventario por producto con historial completo de movimientos.
 
 ---
 
@@ -56,6 +57,23 @@ You can checkout the project here: "https://inventario.segurab.com/"
 ![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1786918938/BlazorInventario/04-Movimientos_xp8kyr.png)
 
 ![App Screenshot](https://res.cloudinary.com/imgresd/image/upload/v1786918921/BlazorInventario/05-Usuarios_vbstyb.png)
+
+---
+
+## Kardex de Inventario
+
+El sistema incluye un módulo de Kardex que permite ver el historial completo de movimientos de cada producto:
+
+- **Selección de producto**: Permite filtrar por producto específico
+- **Filtros avanzados**: Por periodo de tiempo y tipo de movimiento
+- **Historial cronológico**: Muestra evolución de stock y costo promedio
+- **Cálculos en tiempo real**: Stock resultante y costo promedio por movimiento
+- **Exportación CSV**: Genera reportes del kardex con filtros aplicados
+- **Acceso directo**: Disponible desde el menú lateral y desde la pantalla de productos
+
+---
+
+## Productos incluidos en la demo
 
 ## Productos incluidos en la demo
 - Coca-Cola 600 ml — Categoría: Bebidas  
